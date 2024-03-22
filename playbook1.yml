@@ -1,0 +1,56 @@
+- name: Установка и настройка web сервера для Laravel
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Установка необходимых пакетов
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - nginx
+        - php-fpm
+        - php-mysql
+        - mysql-server
+        - composer
+        - iptables
+
+    - name: Клонирование репозитория Laravel с GitHub
+      git:
+        repo: https://github.com/laravel/laravel.git
+        dest: /var/www/laravel
+        force: yes
+
+    - name: Настройка Nginx для Laravel
+      template:
+        src: laravel.conf.j2
+        dest: /etc/nginx/sites-available/laravel
+      notify: Reload Nginx
+
+    - name: Создание пользователя ubuntu
+      user:
+        name: ubuntu
+        groups: sudo
+        append: yes
+
+    - name: Настройка sudo для пользователя ubuntu
+      lineinfile:
+        dest: /etc/sudoers
+        line: 'ubuntu ALL=(ALL) NOPASSWD:ALL'
+
+    - name: Настройка iptables
+      iptables:
+        chain: INPUT
+        protocol: tcp
+        destination_port: "{{ item }}"
+        jump: ACCEPT
+      loop:
+        - 22
+        - 80
+        - 443
+
+  handlers:
+    - name: Reload Nginx
+      service:
+        name: nginx
+        state: reloaded
